@@ -28,13 +28,8 @@ fi
 print_msg "General configuration..."
 
 # Initialize defaults
-JAIL_IP=""
-JAIL_INTERFACES=""
-DEFAULT_GW_IP=""
-INTERFACE="vnet0"
-VNET="on"
 POOL_PATH=""
-JAIL_NAME="wordpress"
+JAIL_NAME=""
 TIME_ZONE=""
 WP_ROOT="/jails/wordpress"
 CONFIG_NAME="wordpress-config"
@@ -91,18 +86,6 @@ if [ "$(ls -A "${FILES_PATH}")" ] || [ "$(ls -A "${DB_PATH}")" ]
 then
   print_err "This script only works for new installations. The script cannot proceed if ${FILES_PATH} and ${DB_PATH} are not both empty."
   exit 1
-fi
-
-# Extract IP and netmask, sanity check netmask
-IP=$(echo ${JAIL_IP} | cut -f1 -d/)
-NETMASK=$(echo ${JAIL_IP} | cut -f2 -d/)
-if [ "${NETMASK}" = "${IP}" ]
-then
-  NETMASK="24"
-fi
-if [ "${NETMASK}" -lt 8 ] || [ "${NETMASK}" -gt 30 ]
-then
-  NETMASK="24"
 fi
 
 # Reuse the password file if it exists and is valid
