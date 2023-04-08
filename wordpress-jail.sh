@@ -36,14 +36,14 @@ VNET="on"
 POOL_PATH=""
 JAIL_NAME="wordpress"
 TIME_ZONE=""
-WP_ROOT="/apps/wordpress"
+WP_ROOT="/jails/wordpress"
 CONFIG_NAME="wordpress-config"
 
 # Exposed configuration parameters
 # php.ini
-UPLOAD_MAX_FILESIZE="32M"	# default=2M
-POST_MAX_SIZE="48M"		# default=8M
-MEMORY_LIMIT="256M"		# default=128M
+UPLOAD_MAX_FILESIZE="100M"	# default=2M
+POST_MAX_SIZE="64M"		# default=8M
+MEMORY_LIMIT="1024M"		# default=128M
 MAX_EXECUTION_TIME=600		# default=30 seconds
 MAX_INPUT_VARS=3000		# default=1000
 MAX_INPUT_TIME=1000		# default=60 seconds
@@ -64,18 +64,7 @@ RELEASE=$(freebsd-version | cut -d - -f -1)"-RELEASE"
 print_msg "Input/Config Sanity checks..."
 
 # Check that necessary variables were set by nextcloud-config
-if [ -z "${JAIL_IP}" ]; then
-  print_err 'Configuration error: JAIL_IP must be set'
-  exit 1
-fi
-if [ -z "${JAIL_INTERFACES}" ]; then
-  print_msg 'JAIL_INTERFACES defaulting to: vnet0:bridge0'
-  JAIL_INTERFACES="vnet0:bridge0"
-fi
-if [ -z "${DEFAULT_GW_IP}" ]; then
-  print_err 'Configuration error: DEFAULT_GW_IP must be set'
-  exit 1
-fi
+
 if [ -z "${POOL_PATH}" ]; then
   POOL_PATH="/mnt/$(iocage get -p)"
   print_msg 'POOL_PATH defaulting to '$POOL_PATH
@@ -145,19 +134,19 @@ print_msg "Jail Creation. Time for a cuppa. Installing packages will take a whil
 cat <<__EOF__ >/tmp/pkg.json
 {
   "pkgs":[
-  "php74","php74-curl","php74-dom","php74-exif","php74-fileinfo","php74-json","php74-mbstring",
-  "php74-mysqli","php74-pecl-libsodium","php74-openssl","php74-pecl-imagick","php74-xml","php74-zip",
-  "php74-filter","php74-gd","php74-iconv","php74-pecl-mcrypt","php74-simplexml","php74-xmlreader","php74-zlib",
-  "php74-ftp","php74-pecl-ssh2","php74-sockets",
-  "mariadb105-server","unix2dos","ssmtp","phpmyadmin5-php74",
-  "php74-xmlrpc","php74-ctype","php74-session","php74-xmlwriter",
-  "redis","php74-pecl-redis","php74-phar","caddy"
+  "php82","php82-curl","php82-dom","php82-exif","php82-fileinfo","php82-json","php82-mbstring",
+  "php82-mysqli","php82-pecl-libsodium","php82-openssl","php82-pecl-imagick","php82-xml","php82-zip",
+  "php82-filter","php82-gd","php82-iconv","php82-pecl-mcrypt","php82-simplexml","php82-xmlreader","php82-zlib",
+  "php82-ftp","php82-pecl-ssh2","php82-sockets",
+  "mariadb106-server","unix2dos","ssmtp","phpmyadmin5-php82",
+  "php82-xmlrpc","php82-ctype","php82-session","php82-xmlwriter",
+  "redis","php82-pecl-redis","php82-phar","caddy"
   ]
 }
 __EOF__
 
 # Create the jail and install previously listed packages
-if ! iocage create --name "${JAIL_NAME}" -p /tmp/pkg.json -r "${RELEASE}" interfaces="${JAIL_INTERFACES}" ip4_addr="${INTERFACE}|${IP}/${NETMASK}" defaultrouter="${DEFAULT_GW_IP}" boot="on" host_hostname="${JAIL_NAME}" vnet="${VNET}"
+if ! iocage create --name "${JAIL_NAME}" -p /tmp/pkg.json -r "${RELEASE}" dhcp="on" boot="on" host_hostname="${JAIL_NAME}""
 then
   print_err "Failed to create jail"
   exit 1
