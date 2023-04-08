@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build an iocage jail under FreeNAS 11.3-12.0 using the latest release of WordPress
+# Build an iocage jail under TrueNas 12.* using the latest release of WordPress (php82, MariaDB-10.6)
 # git clone https://github.com/basilhendroff/freenas-iocage-wordpress
 
 print_msg () {
@@ -28,8 +28,13 @@ fi
 print_msg "General configuration..."
 
 # Initialize defaults
+JAIL_IP=""
+JAIL_INTERFACES=""
+DEFAULT_GW_IP=""
+INTERFACE="vnet0"
+VNET="on"
 POOL_PATH=""
-JAIL_NAME=""
+JAIL_NAME="wordpress"
 TIME_ZONE=""
 WP_ROOT="/jails/wordpress"
 CONFIG_NAME="wordpress-config"
@@ -38,7 +43,7 @@ CONFIG_NAME="wordpress-config"
 # php.ini
 UPLOAD_MAX_FILESIZE="100M"	# default=2M
 POST_MAX_SIZE="64M"		# default=8M
-MEMORY_LIMIT="1024M"		# default=128M
+MEMORY_LIMIT="512M"		# default=128M
 MAX_EXECUTION_TIME=600		# default=30 seconds
 MAX_INPUT_VARS=3000		# default=1000
 MAX_INPUT_TIME=1000		# default=60 seconds
@@ -59,7 +64,18 @@ RELEASE=$(freebsd-version | cut -d - -f -1)"-RELEASE"
 print_msg "Input/Config Sanity checks..."
 
 # Check that necessary variables were set by nextcloud-config
-
+if [ -z "${JAIL_IP}" ]; then
+  print_err 'Configuration error: JAIL_IP must be set'
+  exit 1
+fi
+if [ -z "${JAIL_INTERFACES}" ]; then
+  print_msg 'JAIL_INTERFACES defaulting to: vnet0:bridge0'
+  JAIL_INTERFACES="vnet0:bridge0"
+fi
+if [ -z "${DEFAULT_GW_IP}" ]; then
+  print_err 'Configuration error: DEFAULT_GW_IP must be set'
+  exit 1
+fi
 if [ -z "${POOL_PATH}" ]; then
   POOL_PATH="/mnt/$(iocage get -p)"
   print_msg 'POOL_PATH defaulting to '$POOL_PATH
@@ -86,6 +102,18 @@ if [ "$(ls -A "${FILES_PATH}")" ] || [ "$(ls -A "${DB_PATH}")" ]
 then
   print_err "This script only works for new installations. The script cannot proceed if ${FILES_PATH} and ${DB_PATH} are not both empty."
   exit 1
+fi
+
+# Extract IP and netmask, sanity check netmask
+IP=$(echo ${JAIL_IP} | cut -f1 -d/)
+NETMASK=$(echo ${JAIL_IP} | cut -f2 -d/)
+if [ "${NETMASK}" = "${IP}" ]
+then
+  NETMASK="24"
+fi
+if [ "${NETMASK}" -lt 8 ] || [ "${NETMASK}" -gt 30 ]
+then
+  NETMASK="24"
 fi
 
 # Reuse the password file if it exists and is valid
@@ -117,19 +145,13 @@ print_msg "Jail Creation. Time for a cuppa. Installing packages will take a whil
 cat <<__EOF__ >/tmp/pkg.json
 {
   "pkgs":[
-  "php82","php82-curl","php82-dom","php82-exif","php82-fileinfo","php82-json","php82-mbstring",
-  "php82-mysqli","php82-pecl-libsodium","php82-openssl","php82-pecl-imagick","php82-xml","php82-zip",
-  "php82-filter","php82-gd","php82-iconv","php82-pecl-mcrypt","php82-simplexml","php82-xmlreader","php82-zlib",
-  "php82-ftp","php82-pecl-ssh2","php82-sockets",
-  "mariadb106-server","unix2dos","ssmtp","phpmyadmin5-php82",
-  "php82-xmlrpc","php82-ctype","php82-session","php82-xmlwriter",
-  "redis","php82-pecl-redis","php82-phar","caddy"
+  "php82","php82-curl","php82-dom","php82-exif","php82-fileinfo","php82-json","php82-mbstring","php82-mysqli","php82-pecl-libsodium","php82-openssl","php82-pecl-imagick","php82-xml","php82-zip","php82-filter","php82-gd","php82-iconv","php82-pecl-mcrypt","php82-simplexml","php82-xmlreader","php82-zlib","php82-ftp","php82-pecl-ssh2","php82-sockets","mariadb106-server","unix2dos","ssmtp","phpmyadmin5-php82","php82-xmlrpc","php82-ctype","php82-session","php82-xmlwriter","redis","php82-pecl-redis","php82-phar","caddy"
   ]
 }
 __EOF__
 
 # Create the jail and install previously listed packages
-if ! iocage create --name "${JAIL_NAME}" -p /tmp/pkg.json -r "${RELEASE}" dhcp="on" boot="on" host_hostname="${JAIL_NAME}""
+if ! iocage create --name "${JAIL_NAME}" -p /tmp/pkg.json -r "${RELEASE}" -b interfaces="${JAIL_INTERFACES}" ip4_addr="${INTERFACE}|${IP}/${NETMASK}" defaultrouter="${DEFAULT_GW_IP}" boot="on" host_hostname="${JAIL_NAME}" vnet="${VNET}"
 then
   print_err "Failed to create jail"
   exit 1
